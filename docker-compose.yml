@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./runtime:/app/runtime
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  transcriber:
+    build:
+      context: ./services/transcriber
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./runtime:/app/runtime
+      - ./models:/app/models
+    environment:
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Future services
+  analyzer:
+    build:
+      context: ./services/analyzer
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./runtime:/app/runtime
+    environment:
+      - PYTHONPATH=/app
+    profiles:
+      - full
+    restart: unless-stopped
+
+  exporter:
+    build:
+      context: ./services/exporter
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./runtime:/app/runtime
+    environment:
+      - PYTHONPATH=/app
+    profiles:
+      - full
+    restart: unless-stopped
+
+volumes:
+  runtime:
+  models:
