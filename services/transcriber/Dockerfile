@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install system dependencies for PyAV and librosa
 RUN apt-get update && apt-get install -y \
+    build-essential \
     pkg-config \
     libavformat-dev \
     libavcodec-dev \
