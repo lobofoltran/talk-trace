@@ -13,9 +13,45 @@ The system is designed for:
 * strict testability
 * AI-agent operability (Codex/GPT)
 * Linux + CPU-first runtime
+* Clean Architecture principles
 
 TalkTrace is intentionally **not** a SaaS platform.
 It is a reproducible CLI + microservice pipeline.
+
+---
+
+# Clean Architecture Implementation
+
+## Architecture Layers
+
+All services follow Clean Architecture with strict dependency rules:
+
+```
+services/<service>/
+├── app/
+│   ├── api/                    # Outermost layer
+│   │   └── routes/            # HTTP endpoints, request/response mapping
+│   ├── application/           # Use cases, orchestrators, business rules
+│   ├── domain/                # Innermost layer - business logic, entities, ports
+│   └── infrastructure/        # External integrations, adapters, implementations
+└── tests/
+```
+
+## Dependency Direction
+
+**Inward only**: Domain ← Application ← Infrastructure ← API
+
+* **Domain**: Pure business logic, entities, ports (interfaces)
+* **Application**: Use cases, orchestrators, business rules
+* **Infrastructure**: External integrations, adapters, implementations
+* **API**: HTTP endpoints, request/response mapping
+
+### Key Rules
+
+* **No circular dependencies** between layers
+* **Interface segregation** in domain layer
+* **Dependency injection** for all external dependencies
+* **Never import from outer layers** (e.g., API cannot import from Infrastructure)
 
 ---
 
@@ -65,9 +101,9 @@ Allowed:
 
 ## 3. Minimal Microservices, Clear Boundaries
 
-The system is split into small Python services:
+The system is split into small Python services using Clean Architecture:
 
-* orchestrator (recording + session control)
+* recorder (recording + session control)
 * transcriber
 * analyzer
 * exporter
@@ -78,6 +114,7 @@ Each service is:
 * HTTP-only
 * contract-first via OpenAPI
 * independently testable
+* **Clean Architecture compliant**
 
 No cross-importing between services is allowed.
 
@@ -104,6 +141,7 @@ Every service must maintain:
 * pytest unit tests
 * > 80% coverage
 * full route + schema coverage
+* Clean Architecture testing (mock external dependencies)
 
 No feature is complete without tests.
 
@@ -115,21 +153,24 @@ No feature is complete without tests.
 
 ```
 ┌──────────────┐
-│ Orchestrator │  (entrypoint)
-│ Recorder     │
+│ Recorder     │  (entrypoint)
+│ (Clean Arch) │
 └────┬─────────┘
      │ creates session + input.wav
      ▼
 ┌──────────────┐
 │ Transcriber  │  → transcript.txt
+│ (Clean Arch) │
 └────┬─────────┘
      ▼
 ┌──────────────┐
 │ Analyzer     │  → analysis.json + report.md
+│ (Clean Arch) │
 └────┬─────────┘
      ▼
 ┌──────────────┐
 │ Exporter     │  → anki.apkg
+│ (Clean Arch) │
 └────┬─────────┘
      ▼
 ┌──────────┐
@@ -146,35 +187,63 @@ All steps communicate only via:
 
 # Service Responsibilities
 
-## 1. Orchestrator (Recorder + Session Finalizer)
+## 1. Recorder Service
 
-**Purpose:** Entry-point service that manages the full session lifecycle.
+**Purpose:** Entry-point service that manages audio recording and session creation.
+
+### Clean Architecture Structure
+
+```
+services/recorder/
+├── app/
+│   ├── api/routes/
+│   │   └── sessions.py      # HTTP endpoints for session management
+│   ├── application/
+│   │   └── session_service.py  # Use cases for session lifecycle
+│   ├── domain/
+│   │   ├── entities.py     # Session entity
+│   │   └── ports.py         # Interfaces for recording, storage
+│   └── infrastructure/
+│       ├── adapters.py     # FFmpeg recording implementation
+│       └── storage.py       # File system storage implementation
+```
 
 ### Responsibilities
 
 * Create session directory
 * Capture audio via ffmpeg
 * Write `input.wav`
-* Call pipeline services in order:
-
-  1. transcriber
-  2. analyzer
-  3. exporter
-* Finalize session by writing `completed.json`
-* Append errors to `errors.log`
+* Manage session lifecycle
 
 ### Boundary
 
 * Does NOT transcribe
 * Does NOT analyze
 * Does NOT export flashcards
-* Only coordinates
+* Only coordinates recording
 
 ---
 
 ## 2. Transcriber Service
 
 **Purpose:** Convert raw audio into text.
+
+### Clean Architecture Structure
+
+```
+services/transcriber/
+├── app/
+│   ├── api/routes/
+│   │   └── transcribe.py    # HTTP endpoints for transcription
+│   ├── application/
+│   │   └── transcribe_service.py  # Use cases for transcription
+│   ├── domain/
+│   │   ├── entities.py     # Transcription entity
+│   │   └── ports.py         # Transcriber interface
+│   └── infrastructure/
+│       ├── adapters.py     # Whisper, Faster-Whisper implementations
+│       └── factory.py      # Transcriber factory pattern
+```
 
 ### Input Artifact
 
@@ -186,7 +255,9 @@ All steps communicate only via:
 
 ### Responsibilities
 
-* Run speech-to-text transcription (Whisper adapter)
+* Run speech-to-text transcription (Whisper + Faster-Whisper adapters)
+* Factory pattern for transcriber selection
+* Strategy pattern for runtime selection
 * Write deterministic transcript output
 * Append failures to `errors.log`
 
@@ -200,6 +271,23 @@ All steps communicate only via:
 ## 3. Analyzer Service
 
 **Purpose:** Analyze transcript and generate learning feedback.
+
+### Clean Architecture Structure
+
+```
+services/analyzer/
+├── app/
+│   ├── api/routes/
+│   │   └── analyze.py       # HTTP endpoints for analysis
+│   ├── application/
+│   │   └── analysis_service.py  # Use cases for analysis
+│   ├── domain/
+│   │   ├── entities.py     # Analysis entity, patterns
+│   │   └── ports.py         # Analyzer interface
+│   └── infrastructure/
+│       ├── adapters.py     # Grammar analysis implementation
+│       └── generators.py   # Report generation
+```
 
 ### Input Artifact
 
@@ -228,6 +316,23 @@ All steps communicate only via:
 ## 4. Exporter Service
 
 **Purpose:** Convert analysis into Anki study material.
+
+### Clean Architecture Structure
+
+```
+services/exporter/
+├── app/
+│   ├── api/routes/
+│   │   └── export.py        # HTTP endpoints for export
+│   ├── application/
+│   │   └── export_service.py  # Use cases for export
+│   ├── domain/
+│   │   ├── entities.py     # Export entity, card structure
+│   │   └── ports.py         # Exporter interface
+│   └── infrastructure/
+│       ├── adapters.py     # Anki deck generation
+│       └── formatters.py   # CSV, JSON export implementations
+```
 
 ### Input Artifacts
 
@@ -282,6 +387,25 @@ Production server:
 
 ---
 
+# Clean Architecture Benefits
+
+## 1. Testability
+* Each layer can be tested independently
+* External dependencies are easily mocked
+* Business logic is isolated from infrastructure
+
+## 2. Maintainability
+* Clear separation of concerns
+* Dependencies flow inward
+* Easy to understand and modify
+
+## 3. Flexibility
+* Easy to swap implementations (e.g., different transcribers)
+* Business logic doesn't depend on external systems
+* Interface-based design allows multiple implementations
+
+---
+
 # Key Documents
 
 * `AGENTS.md` — agent contract
@@ -298,5 +422,6 @@ TalkTrace is designed as:
 * a reproducible learning pipeline
 * an AI-agent friendly codebase
 * a minimal deterministic system
+* a Clean Architecture implementation
 
-Any deviation from determinism, testing discipline, or contract-first design is considered a contract violation.
+Any deviation from determinism, testing discipline, contract-first design, or Clean Architecture principles is considered a contract violation.

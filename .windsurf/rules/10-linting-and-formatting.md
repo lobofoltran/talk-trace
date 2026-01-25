@@ -13,6 +13,13 @@ trigger: always_on
 - Keep files ≤ 200 lines → Ruff will warn on complexity indirectly.
 - Type hints: Ruff checks basic annotations (ANN); aim for full coverage in public APIs.
 
+## Clean Architecture Compliance
+- Ruff will catch import violations (circular dependencies)
+- Enforce proper layer separation through import rules
+- Check that API layer doesn't import from Infrastructure
+- Verify Domain layer has no external dependencies
+
 When suggesting code:
 - Ensure it would pass `ruff check` with current config.
 - If adding new rule violation, explain why and propose ignore + comment.
+- Verify Clean Architecture import rules are followed

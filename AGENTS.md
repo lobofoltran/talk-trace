@@ -1,6 +1,6 @@
 # AGENTS.md — TalkTrace Agent Contract (Codex-First)
 
-**Local-first, artifact-driven speech learning pipeline**
+**Local-first, artifact-driven speech learning pipeline using Clean Architecture**
 
 Record → Transcribe → Analyze → Report → Export → Review
 
@@ -10,7 +10,16 @@ This repository is designed to be operated by AI agents (Codex, GPT, Claude) wit
 
 # 1. NON-NEGOTIABLE RULES (MUST)
 
-## 1.1 Minimal + Pragmatic Engineering
+## 1.1 Clean Architecture is MANDATORY
+- **All services MUST follow Clean Architecture**
+- **Dependency Direction**: Inward only (Domain ← Application ← Infrastructure ← API)
+- **No circular dependencies** between layers
+- **Interface segregation** in domain layer
+- **Never import from outer layers** (e.g., API cannot import from Infrastructure)
+
+---
+
+## 1.2 Minimal + Pragmatic Engineering
 - No overengineering
 - No unnecessary abstractions
 - No premature scalability layers
@@ -18,14 +27,14 @@ This repository is designed to be operated by AI agents (Codex, GPT, Claude) wit
 
 ---
 
-## 1.2 Hard File Size Limit (Python)
+## 1.3 Hard File Size Limit (Python)
 - Every Python source file MUST be **< 200 lines**
   - Excluding blank lines + comments
 - If logic grows → split into another module immediately
 
 ---
 
-## 1.3 Testing is Mandatory
+## 1.4 Testing is Mandatory
 - Every service MUST maintain:
   - **> 80% unit test coverage**
   - `pytest + coverage`
@@ -41,10 +50,9 @@ test_service.py
 test_adapters.py
 ```
 
-
 ---
 
-## 1.4 Deterministic Outputs (Reproducibility)
+## 1.5 Deterministic Outputs (Reproducibility)
 Given the same inputs, artifacts MUST be byte-for-byte identical.
 
 Forbidden:
@@ -58,7 +66,7 @@ Allowed:
 
 ---
 
-## 1.5 Artifact-Driven Execution
+## 1.6 Artifact-Driven Execution
 Every pipeline step MUST:
 
 1. Write its main artifact to:
@@ -73,15 +81,14 @@ runtime/sessions/<session_id>/
 runtime/sessions/<session_id>/errors.log
 ```
 
-
 Never fail silently.
 
 ---
 
-## 1.6 Communication Model
+## 1.7 Communication Model
 Services communicate ONLY via:
 
-- HTTP APIs (Flask)
+- HTTP APIs (FastAPI)
 - OpenAPI contracts (`openapi.yaml`)
 - Shared disk artifacts
 
@@ -92,7 +99,7 @@ Explicitly forbidden:
 
 ---
 
-## 1.7 Runtime Constraints
+## 1.8 Runtime Constraints
 - Linux-only
 - CPU-first
 - Docker-first
@@ -127,30 +134,42 @@ docs/
 
 ---
 
-## 2.2 Standard Service Template
+## 2.2 Standard Service Template (Clean Architecture)
 
 Each service MUST follow:
 
 ```
 services/<name>/
-app.py        # Flask entrypoint (minimal)
-routes.py     # HTTP endpoints only (Blueprint)
-service.py    # Core business logic / use cases
-adapters.py   # External integrations (FS, Whisper, Anki)
-openapi.yaml  # Contract-first API definition
-tests/        # Unit tests
+├── app/
+│   ├── api/
+│   │   └── routes/            # HTTP endpoints, request/response mapping
+│   ├── application/           # Use cases, orchestrators, business rules
+│   ├── domain/                # Business logic, entities, ports (interfaces)
+│   └── infrastructure/        # External integrations, adapters, implementations
+├── app.py                     # FastAPI entrypoint (minimal)
+├── openapi.yaml              # Contract-first API definition
+└── tests/                    # Unit tests
 ```
 
+### Clean Architecture Layer Responsibilities
+
+| Layer | Responsibilities | Forbidden |
+|-------|------------------|------------|
+| **API** | HTTP endpoints, request/response mapping | Business logic, external dependencies |
+| **Application** | Use cases, orchestrators, business rules | Direct external calls, HTTP frameworks |
+| **Domain** | Business logic, entities, ports (interfaces) | External dependencies, frameworks |
+| **Infrastructure** | External integrations, adapters, implementations | Business logic |
 
 ### File Responsibilities
 
-| File         | Allowed Content |
-|-------------|----------------|
-| app.py       | Flask boot only |
-| routes.py    | Request/response mapping only |
-| service.py   | Pure business logic |
-| adapters.py  | External side effects (fs, AI models, exports) |
-| tests/       | Unit coverage for all layers |
+| File | Allowed Content |
+|------|----------------|
+| app.py | FastAPI boot only |
+| app/api/routes/ | Request/response mapping only |
+| app/application/ | Use cases, business rules |
+| app/domain/ | Business logic, entities, ports |
+| app/infrastructure/ | External side effects (fs, AI models, exports) |
+| tests/ | Unit coverage for all layers |
 
 ---
 
@@ -168,7 +187,6 @@ anki.apkg
 errors.log
 ```
 
-
 Rules:
 - Artifacts are append-only
 - Completed sessions become immutable
@@ -184,7 +202,6 @@ Agents MUST treat all files under:
 .windsurf/rules/
 ```
 
-
 as binding law.
 
 Key enforcement areas:
@@ -195,6 +212,7 @@ Key enforcement areas:
 - Security + best practices
 - PR review simulation
 - GitFlow enforcement
+- **Clean Architecture compliance**
 
 Do NOT ignore these rules.
 
@@ -218,6 +236,7 @@ Before coding, produce:
 - Files to change
 - Tests to add
 - Expected artifacts
+- **Clean Architecture layer placement**
 
 ## Step 3 — Generate in Small Commits
 Use GitFlow branches:
@@ -238,10 +257,35 @@ Conventional commits only:
 - Coverage > 80%
 - File size compliance (<200 LOC)
 - Deterministic artifact guarantee
+- **Clean Architecture compliance**
 
 ---
 
-# 6. DEFAULT ERROR HANDLING CONTRACT
+# 6. CLEAN ARCHITECTURE CHECKLIST
+
+Before completing any task, verify:
+
+## 6.1 Layer Separation
+- [ ] API layer only handles HTTP concerns
+- [ ] Application layer contains use cases
+- [ ] Domain layer has pure business logic
+- [ ] Infrastructure layer handles external integrations
+
+## 6.2 Dependency Rules
+- [ ] Dependencies flow inward only
+- [ ] No circular dependencies
+- [ ] Domain layer has no external dependencies
+- [ ] API layer doesn't import from Infrastructure
+
+## 6.3 Interface Design
+- [ ] Interfaces defined in domain layer
+- [ ] Implementations in infrastructure layer
+- [ ] Dependency injection used throughout
+- [ ] Interface segregation followed
+
+---
+
+# 7. DEFAULT ERROR HANDLING CONTRACT
 
 On any failure:
 
@@ -254,3 +298,26 @@ Example log line:
 ```txt
 [transcriber] failed: whisper model not available
 ```
+
+---
+
+# 8. CLEAN ARCHITECTURE BENEFITS
+
+## 8.1 Testability
+- Each layer can be tested independently
+- External dependencies are easily mocked
+- Business logic is isolated from infrastructure
+
+## 8.2 Maintainability
+- Clear separation of concerns
+- Dependencies flow inward
+- Easy to understand and modify
+
+## 8.3 Flexibility
+- Easy to swap implementations (e.g., different transcribers)
+- Business logic doesn't depend on external systems
+- Interface-based design allows multiple implementations
+
+---
+
+**Remember: Clean Architecture is not optional - it's mandatory for all services in TalkTrace!**

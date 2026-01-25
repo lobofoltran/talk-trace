@@ -16,5 +16,8 @@ Before marking a task as complete, mentally run this checklist:
 8. Happy path + 2–3 error cases tested?
 9. Dependencies injected (no hardcoded paths)?
 10. Follows existing naming/patterns in the service?
+11. **Clean Architecture compliance?** (no outer layer imports)
+12. **Layer separation maintained?** (API → Infrastructure → Application → Domain)
+13. **Interface segregation followed?** (small, focused interfaces)
 
 If any no → fix before proposing merge/PR
