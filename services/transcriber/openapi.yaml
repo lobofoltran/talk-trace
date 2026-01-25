@@ -1,0 +1,112 @@
+openapi: 3.0.0
+info:
+  title: TalkTrace Transcriber API
+  description: Speech-to-text transcription service using Whisper
+  version: 1.0.0
+
+paths:
+  /transcribe:
+    post:
+      summary: Transcribe audio file to text
+      operationId: transcribeAudio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscribeRequest'
+      responses:
+        '200':
+          description: Transcription completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscribeResponse'
+        '404':
+          description: Session or audio file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    TranscribeRequest:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          description: Session identifier containing input.wav
+        model:
+          type: string
+          enum: [tiny, base, small, medium, large-v3]
+          default: base
+          description: Whisper model size
+        language:
+          type: string
+          default: auto
+          description: Language code (e.g., en, pt, es) or auto
+
+    TranscribeResponse:
+      type: object
+      required: [success, session_id]
+      properties:
+        success:
+          type: boolean
+          description: Whether transcription succeeded
+        session_id:
+          type: string
+          description: Session identifier
+        transcript:
+          type: string
+          description: Transcribed text (null if failed)
+        duration:
+          type: number
+          format: float
+          description: Audio duration in seconds (null if failed)
+        error:
+          type: string
+          description: Error message (null if succeeded)
+
+    ErrorResponse:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+          description: Error description
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: talktrace-transcriber
