@@ -2,6 +2,18 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
+# Install system dependencies for PyAV and librosa
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libswresample-dev \
+    libavfilter-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
