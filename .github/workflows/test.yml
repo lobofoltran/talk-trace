@@ -1,0 +1,95 @@
+name: Test Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev pkg-config
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+
+    - name: Test Orchestrator Service
+      run: |
+        cd services/orchestrator
+        pip install -r requirements.txt
+        pytest --cov=app --cov-report=xml --cov-report=term-missing
+
+    - name: Test Transcriber Service
+      run: |
+        cd services/transcriber
+        pip install -r requirements.txt
+        pytest --cov=app --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./services/orchestrator/coverage.xml,./services/transcriber/coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Orchestrator Docker Image
+      run: |
+        cd services/orchestrator
+        docker build -t talktrace/orchestrator:latest .
+
+    - name: Build Transcriber Docker Image
+      run: |
+        cd services/transcriber
+        docker build -t talktrace/transcriber:latest .
+
+    - name: Test Docker Images
+      run: |
+        # Test that images can start and respond to health checks
+        docker run -d --name orchestrator-test -p 8000:8000 talktrace/orchestrator:latest
+        docker run -d --name transcriber-test -p 8001:8001 talktrace/transcriber:latest
+        
+        # Wait for services to start
+        sleep 10
+        
+        # Test health endpoints
+        curl -f http://localhost:8000/health || exit 1
+        curl -f http://localhost:8001/health || exit 1
+        
+        # Cleanup
+        docker stop orchestrator-test transcriber-test
+        docker rm orchestrator-test transcriber-test
